@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>隔空阅读 · 远程后台</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+         background:#f3f5f9; color:#1f2733; font-size:15px; }
+  .wrap { max-width:560px; margin:0 auto; padding:14px 14px 60px; }
+  h1 { font-size:19px; margin:6px 0 2px; }
+  .sub { color:#8a94a6; font-size:12px; margin-bottom:12px; }
+  .card { background:#fff; border-radius:14px; padding:14px; margin-bottom:14px;
+          box-shadow:0 1px 3px rgba(20,30,60,.06); }
+  .card h2 { font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:6px; }
+  label { display:block; font-size:12px; color:#6b7585; margin:10px 0 4px; }
+  input,textarea,select { width:100%; padding:10px; border:1px solid #dfe4ec; border-radius:10px;
+          font-size:15px; background:#fafbfc; color:#1f2733; }
+  textarea { resize:vertical; min-height:60px; }
+  button { border:none; border-radius:10px; padding:11px 14px; font-size:15px; cursor:pointer;
+           background:#3b6cff; color:#fff; font-weight:600; }
+  button.ghost { background:#eef2ff; color:#3b6cff; }
+  button.danger { background:#ffe9ea; color:#e23b3b; }
+  button.sm { padding:7px 11px; font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:0; }
+  .item { border:1px solid #eef1f6; border-radius:10px; padding:10px; margin-bottom:8px; }
+  .item .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .item .t { font-weight:600; }
+  .item .meta { color:#8a94a6; font-size:12px; margin-top:2px; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:20px; }
+  .on { background:#e6f9ee; color:#1aa85a; }
+  .off { background:#ffe9ea; color:#e23b3b; }
+  .q { font-size:13px; padding:8px 10px; border-bottom:1px solid #f0f2f6; }
+  .q:last-child { border-bottom:none; }
+  .q .a { color:#1aa85a; font-size:12px; margin-top:2px; }
+  .hide { display:none; }
+  .toast { position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
+           background:rgba(30,40,60,.92); color:#fff; padding:10px 16px; border-radius:24px;
+           font-size:14px; z-index:99; opacity:0; transition:.25s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .login { max-width:360px; margin:18vh auto 0; }
+  .login .card { padding:22px; }
+  .tip { font-size:12px; color:#e8902a; background:#fff7ec; padding:8px 10px; border-radius:8px; margin-top:8px; }
+  .seg { display:flex; gap:0; border:1px solid #dfe4ec; border-radius:10px; overflow:hidden; }
+  .seg button { flex:1; border-radius:0; background:#fafbfc; color:#6b7585; box-shadow:none; }
+  .seg button.act { background:#3b6cff; color:#fff; }
+  .log { font-size:12px; color:#6b7585; line-height:1.7; }
+  .muted { color:#9aa4b4; }
+</style>
+</head>
+<body>
+
+<!-- 登录门禁 -->
+<div id="login" class="login">
+  <div class="card">
+    <h1>📚 隔空阅读后台</h1>
+    <div class="sub">老师 / 维护人入口</div>
+    <label>访问口令</label>
+    <input id="pass" type="password" placeholder="请输入口令" inputmode="numeric">
+    <button style="width:100%;margin-top:14px" onclick="doLogin()">进入</button>
+    <div class="tip">默认口令 8888（请在文件顶部 PASS 处自行修改）。口令仅作简单门禁，数据存于公开 Gitee 仓库。</div>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div id="app" class="wrap hide">
+  <h1>📚 隔空阅读 · 远程后台</h1>
+  <div class="sub">图书上架下架、题目增删、数据查看 · 自动保存</div>
+
+  <div class="card">
+    <h2>📕 图书管理</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button class="ghost sm" onclick="loadAll(true)">🔄 刷新</button>
+    </div>
+    <div id="bookList"></div>
+    <div style="border-top:1px dashed #e6e9f0; margin:12px 0 6px; padding-top:10px">
+      <b style="font-size:13px">＋ 添加图书</b>
+      <label>书名 *</label><input id="nb_title" placeholder="如：小猫钓鱼">
+      <label>作者</label><input id="nb_author" placeholder="选填">
+      <label>适用年级</label><input id="nb_grade" placeholder="如：1-2 或 3-4">
+      <label>简介</label><textarea id="nb_intro" placeholder="一句话介绍（选填）"></textarea>
+      <button style="width:100%;margin-top:10px" onclick="addBook()">保存新书</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>❓ 题目管理</h2>
+    <label>选择图书</label>
+    <select id="qBook"></select>
+    <div class="seg" style="margin:10px 0">
+      <button id="segJ" class="act" onclick="setQType('j')">判断题</button>
+      <button id="segC" onclick="setQType('c')">选择题</button>
+    </div>
+    <label>题干 *</label><textarea id="q_stem" placeholder="如：小猫最后钓到了鱼。"></textarea>
+    <div id="jBox">
+      <label>正确答案</label>
+      <div class="seg">
+        <button id="j1" class="act" onclick="setJ('1')">对</button>
+        <button id="j0" onclick="setJ('0')">错</button>
+      </div>
+    </div>
+    <div id="cBox" class="hide">
+      <label>选项（每行一个，至少 2 个，正确答案打勾）</label>
+      <div id="opts"></div>
+      <button class="ghost sm" onclick="addOpt()">＋ 加一个选项</button>
+    </div>
+    <button style="width:100%;margin-top:12px" onclick="addQuestion()">保存题目</button>
+    <div id="qList" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>📊 操作记录</h2>
+    <div id="logs" class="log muted">暂无记录</div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* =========================================================================
+   配置区（部署后若要改，改这里即可）
+   - owner/repo/branch：Gitee 数据仓库（公开）
+   - token：Gitee 私人令牌（有仓库读写权限，已内嵌。泄露仅影响本仓库，可随时在
+            gitee.com 重新生成令牌替换）
+   - PASS：后台访问口令，请改成只有老师和您知道的数字
+   ========================================================================= */
+const GITEE = {
+  owner:  "a-distinctive-label",
+  repo:   "aireading-data",
+  branch: "master",
+  token:  "2c1b0a460c4a277b7b2e49a599029ea0",
+  PASS:   "8888"
+};
+const API = "https://gitee.com/api/v5/repos/" + GITEE.owner + "/" + GITEE.repo + "/contents/";
+
+let BOOKS = [];      // [{id,title,author,grade,cover,intro,online,updated_at}]
+let QUESTIONS = [];  // [{id,book_id,line,updated_at}]
+let LOGS = [];       // [{ts,action,target}]
+let QTYPE = "j";
+let JANS = "1";
+
+/* ---------- 工具 ---------- */
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1800); }
+function b64utf8(b64){ const bin=atob(b64.replace(/\s/g,""));
+  const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(a); }
+function utf8ToB64(str){ const b=new TextEncoder().encode(str);
+  let s=""; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+function uid(){ return Date.now(); }
+
+/* ---------- Gitee 读写 ---------- */
+async function giteeGet(path){
+  const r = await fetch(API+path+"?ref="+GITEE.branch);
+  if(!r.ok) throw new Error("读取失败 HTTP "+r.status);
+  const d = await r.json();
+  return { text: b64utf8(d.content), sha: d.sha };
+}
+async function giteeSave(path, text, message){
+  // 先取 sha（更新用），没有则新建
+  let sha=null;
+  try{ const cur=await giteeGet(path); sha=cur.sha; }catch(e){}
+  const body={ access_token:GITEE.token, content:utf8ToB64(text),
+               message:message||("update "+path), branch:GITEE.branch };
+  const method = sha ? "PUT" : "POST";   // 文件不存在→POST新建；已存在→PUT更新
+  if(sha) body.sha=sha;
+  const r=await fetch(API+path, { method, headers:{"Content-Type":"application/json"},
+                body:JSON.stringify(body) });
+  if(!r.ok) throw new Error("保存失败 HTTP "+r.status);
+  return true;
+}
+
+/* ---------- 加载 ---------- */
+async function loadAll(showTip){
+  try{
+    const [b,q,l] = await Promise.all([
+      giteeGet("data/books.json").catch(()=>({text:"[]",sha:null})),
+      giteeGet("data/questions.json").catch(()=>({text:"[]",sha:null})),
+      giteeGet("data/logs.json").catch(()=>({text:"[]",sha:null}))
+    ]);
+    BOOKS = JSON.parse(b.text||"[]");
+    QUESTIONS = JSON.parse(q.text||"[]");
+    try{ LOGS = JSON.parse(l.text||"[]"); }catch(e){ LOGS=[]; }
+    renderBooks(); renderQBooks(); renderLogs();
+    if(showTip) toast("✅ 已刷新");
+  }catch(e){ toast("⚠️ "+e.message); }
+}
+
+/* ---------- 渲染：图书 ---------- */
+function renderBooks(){
+  const el=document.getElementById("bookList");
+  if(!BOOKS.length){ el.innerHTML='<div class="muted" style="padding:6px">还没有图书，下面添加一本吧。</div>'; return; }
+  el.innerHTML = BOOKS.map(b=>{
+    const on = b.online!==false && b.visible!==0 && b.visible!==false;
+    const cnt = QUESTIONS.filter(q=>q.book_id===b.id).length;
+    return `<div class="item">
+      <div class="top">
+        <div><div class="t">${esc(b.title)}</div>
+          <div class="meta">${esc(b.grade||"")} · ${cnt} 题 · ${on?'<span class="pill on">已上架</span>':'<span class="pill off">已下架</span>'}</div></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost sm" onclick="toggleBook('${b.id}')">${on?'下架':'上架'}</button>
+        <button class="ghost sm" onclick="editBook('${b.id}')">编辑</button>
+        <button class="danger sm" onclick="delBook('${b.id}')">删除</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- 图书操作 ---------- */
+function addBook(){
+  const title=document.getElementById("nb_title").value.trim();
+  if(!title){ toast("请填书名"); return; }
+  const b={ id:"bk_"+uid(), title, author:document.getElementById("nb_author").value.trim(),
+            grade:document.getElementById("nb_grade").value.trim(),
+            intro:document.getElementById("nb_intro").value.trim(), cover:"", online:true, updated_at:uid() };
+  BOOKS.push(b); saveBooks("新增图书："+title);
+}
+function toggleBook(id){
+  const b=BOOKS.find(x=>x.id===id); if(!b)return;
+  b.online = !(b.online!==false && b.visible!==0 && b.visible!==false);
+  b.updated_at=uid(); saveBooks((b.online?"上架":"下架")+"："+b.title);
+}
+function editBook(id){
+  const b=BOOKS.find(x=>x.id===id); if(!b)return;
+  const t=prompt("修改书名",b.title); if(t===null)return; b.title=t.trim();
+  const g=prompt("适用年级",b.grade||""); if(g!==null)b.grade=g.trim();
+  const i=prompt("简介",b.intro||""); if(i!==null)b.intro=i.trim();
+  b.updated_at=uid(); saveBooks("编辑图书："+b.title);
+}
+function delBook(id){
+  const b=BOOKS.find(x=>x.id===id); if(!b)return;
+  if(!confirm("确定删除《"+b.title+"》？该书下所有题目也会删除。"))return;
+  BOOKS=BOOKS.filter(x=>x.id!==id);
+  QUESTIONS=QUESTIONS.filter(q=>q.book_id!==id);
+  saveBooks("删除图书："+b.title);
+}
+async function saveBooks(msg){
+  try{ await giteeSave("data/books.json", JSON.stringify(BOOKS,null,2), msg);
+       await pushLog(msg);
+       renderBooks(); renderQBooks(); toast("✅ "+msg); }
+  catch(e){ toast("⚠️ "+e.message); }
+}
+
+/* ---------- 渲染：题目选择 ---------- */
+function renderQBooks(){
+  const sel=document.getElementById("qBook");
+  sel.innerHTML = BOOKS.map(b=>`<option value="${b.id}">${esc(b.title)}</option>`).join("")
+                 || '<option value="">（先添加图书）</option>';
+  renderQList();
+}
+function setQType(t){ QTYPE=t;
+  document.getElementById("segJ").classList.toggle("act",t==="j");
+  document.getElementById("segC").classList.toggle("act",t==="c");
+  document.getElementById("jBox").classList.toggle("hide",t!=="j");
+  document.getElementById("cBox").classList.toggle("hide",t!=="c");
+  if(t==="c" && !document.getElementById("opts").children.length){ addOpt(); addOpt(); }
+}
+function setJ(v){ JANS=v;
+  document.getElementById("j1").classList.toggle("act",v==="1");
+  document.getElementById("j0").classList.toggle("act",v==="0"); }
+function addOpt(){ const d=document.getElementById("opts");
+  const i=d.children.length;
+  const box=document.createElement("div"); box.className="row"; box.style.marginBottom="6px";
+  box.innerHTML=`<input placeholder="选项${i+1}" class="optxt">
+    <button class="ghost sm" style="flex:0 0 70px" onclick="this.parentNode.querySelector('.corr').checked=!this.parentNode.querySelector('.corr').checked">✔正确</button>
+    <input type="checkbox" class="corr" style="flex:0 0 22px;width:22px;height:22px">`;
+  d.appendChild(box);
+}
+
+/* ---------- 题目操作 ---------- */
+function addQuestion(){
+  const bookId=document.getElementById("qBook").value;
+  if(!bookId){ toast("先选图书"); return; }
+  const stem=document.getElementById("q_stem").value.trim();
+  if(!stem){ toast("请填题干"); return; }
+  let line;
+  if(QTYPE==="j"){
+    line="j|"+stem+"|"+JANS;
+  }else{
+    const rows=[...document.querySelectorAll("#opts .optxt")].map(i=>i.value.trim()).filter(Boolean);
+    if(rows.length<2){ toast("选择题至少 2 个选项"); return; }
+    const corrIdx=[...document.querySelectorAll("#opts .corr")].findIndex(c=>c.checked);
+    if(corrIdx<0){ toast("勾选一个正确答案"); return; }
+    line="c|"+stem+"|"+rows.join(",")+"|"+rows[corrIdx];
+  }
+  QUESTIONS.push({ id:uid(), book_id:bookId, line, updated_at:uid() });
+  document.getElementById("q_stem").value="";
+  if(QTYPE==="c") document.getElementById("opts").innerHTML="";
+  saveQuestions("新增题目");
+}
+function delQ(id){
+  if(!confirm("删除这道题？"))return;
+  QUESTIONS=QUESTIONS.filter(q=>q.id!==id);
+  saveQuestions("删除题目");
+}
+async function saveQuestions(msg){
+  try{ await giteeSave("data/questions.json", JSON.stringify(QUESTIONS,null,2), msg);
+       await pushLog(msg); renderBooks(); renderQList(); toast("✅ "+msg); }
+  catch(e){ toast("⚠️ "+e.message); }
+}
+function renderQList(){
+  const bookId=document.getElementById("qBook").value;
+  const el=document.getElementById("qList");
+  const qs=QUESTIONS.filter(q=>q.book_id===bookId);
+  if(!qs.length){ el.innerHTML='<div class="muted" style="padding:6px">这本书还没有题目。</div>'; return; }
+  el.innerHTML=qs.map(q=>{
+    const p=parseQ(q.line);
+    const txt = p ? (p.t==="judge" ? "判断："+p.stem+" → "+(p.answer?"对":"错")
+                                : "选择："+p.stem+"【"+p.answer+"】")
+                 : q.line;
+    return `<div class="q">${esc(txt)}<div class="row" style="margin-top:4px">
+      <button class="danger sm" onclick="delQ(${q.id})">删除</button></div></div>`;
+  }).join("");
+}
+function parseQ(line){
+  const p=String(line).split("|"); const t=p[0];
+  if(t==="j") return {t:"judge",stem:p[1],answer:(p[2]==="1"||p[2]==="对"||p[2]==="true")};
+  if(t==="c"){ const o=(p[2]||"").split(",").map(s=>s.trim()).filter(Boolean);
+               return {t:"choice",stem:p[1],answer:p[3]}; }
+  return null;
+}
+
+/* ---------- 日志 ---------- */
+async function pushLog(action){
+  LOGS.unshift({ ts:Date.now(), action });
+  LOGS=LOGS.slice(0,100);
+  try{ await giteeSave("data/logs.json", JSON.stringify(LOGS,null,2), "log"); }catch(e){}
+}
+function renderLogs(){
+  const el=document.getElementById("logs");
+  if(!LOGS.length){ el.innerHTML='<span class="muted">暂无记录</span>'; return; }
+  el.innerHTML=LOGS.map(l=>`${new Date(l.ts).toLocaleString("zh-CN")} · ${esc(l.action)}`).join("<br>");
+}
+
+/* ---------- 登录 ---------- */
+function doLogin(){
+  const v=document.getElementById("pass").value;
+  if(v===GITEE.PASS){
+    document.getElementById("login").classList.add("hide");
+    document.getElementById("app").classList.remove("hide");
+    setQType("j"); loadAll(false);
+  }else{ toast("口令错误"); }
+}
+document.getElementById("pass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+</script>
+</body>
+</html>
